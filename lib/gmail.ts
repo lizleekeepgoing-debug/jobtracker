@@ -16,7 +16,6 @@ const ALLOWED_DOMAINS = [
   "rocketpunch.com",
   "blind.com",
   "linkedin.com",
-  "notion.so",
   "greenhouse.io",
   "lever.co",
   "workday.com",
@@ -30,30 +29,24 @@ const JOB_KEYWORDS = [
 const EXCLUDE_SUBJECTS = ["(광고)", "[채용시작]", "추천 포지션"];
 
 function isAllowedSender(from: string, subject: string): boolean {
-  const isLinkedin = from.includes("linkedin.com");
-  if (isLinkedin) {
+  if (from.includes("linkedin.com")) {
     return JOB_KEYWORDS.some((kw) => subject.toLowerCase().includes(kw.toLowerCase()));
   }
   return ALLOWED_DOMAINS.some((domain) => from.includes(domain));
 }
 
-function isExcludedSubject(subject: string):t.includes(ex));
+function isExcludedSubject(subject: string): boolean {
+  return EXCLUDE_SUBJECTS.some((ex) => subject.includes(ex));
 }
 
 export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> {
   const auth = new google.auth.OAuth2();
   auth.setCredentials({ access_token: accessToken });
-
   const gmail = google.gmail({ version: "v1", auth });
-
-  const query = [
-    "from:(wanted.co.kr OR saramin.co.kr OR jobkorea.co.kr OR jumpit.co.kr OR rocketpunch.com OR linkedin.com OR greenhouse.io OR lever.co OR workday.com)",
-    "subject:(지원 OR 채용 OR 합격 OR 불합격 OR 서류 OR 면접 OR 최종 OR apply OR application OR interview OR offer)",
-  ].join(" ");
 
   const listRes = await gmail.users.messages.list({
     userId: "me",
-    q: query,
+    q: "subject:(지원 OR 채용 OR 합격 OR 불합격 OR 면접 OR apply OR interview OR offer)",
     maxResults: 50,
   });
 
@@ -69,7 +62,7 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
       metadataHeaders: ["Subject", "From", "Date"],
     });
 
-    const heaaders || [];
+    const headers = detail.data.payload?.headers || [];
     const subject = headers.find((h) => h.name === "Subject")?.value || "";
     const from = headers.find((h) => h.name === "From")?.value || "";
     const date = headers.find((h) => h.name === "Date")?.value || "";
@@ -91,8 +84,7 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("불합격") ||
     text.includes("아쉽게도") ||
     text.includes("함께하지 못") ||
-    text.includes("다음 기회") ||
-    text.includes("서류 전형 결과") && text.includes("합격하지")
+    text.includes("다음 기회")
   ) return "불합격";
 
   if (
@@ -100,7 +92,11 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("최종합격") ||
     text.includes("입사를 축하") ||
     text.includes("offer")
-  ) return "최종s("서류 전형") && text.includes("합격")
+  ) return "최종합격";
+
+  if (
+    text.includes("서류 합격") ||
+    text.includes("서류합격")
   ) return "서류합격";
 
   if (
@@ -111,7 +107,6 @@ export function classifyStatus(subject: string, snippet: string): string {
   if (
     text.includes("지원") ||
     text.includes("접수") ||
-    text.includes("application received") ||
     text.includes("apply")
   ) return "지원완료";
 
