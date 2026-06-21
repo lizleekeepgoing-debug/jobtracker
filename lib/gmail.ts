@@ -46,8 +46,8 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
 
   const listRes = await gmail.users.messages.list({
     userId: "me",
-    q: "subject:(지원 OR 채용 OR 합격 OR 불합격 OR 면접 OR apply OR interview OR offer)",
-    maxResults: 50,
+    q: "from:(saramin.co.kr OR wantedlab.com OR jobkorea.co.kr OR wanted.co.kr OR getmiso.com OR jumpit.co.kr)",
+    maxResults: 100,
   });
 
   const messages = listRes.data.messages || [];
