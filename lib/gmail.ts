@@ -84,19 +84,25 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("불합격") ||
     text.includes("아쉽게도") ||
     text.includes("함께하지 못") ||
-    text.includes("다음 기회")
+    text.includes("함께하기 어렵") ||
+    text.includes("다음 기회") ||
+    text.includes("탈락")
   ) return "불합격";
 
   if (
     text.includes("최종 합격") ||
     text.includes("최종합격") ||
+    text.includes("최종 전형") && text.includes("합격") ||
     text.includes("입사를 축하") ||
-    text.includes("offer")
+    text.includes("offer letter") ||
+    text.includes("pleased to offer")
   ) return "최종합격";
 
   if (
     text.includes("서류 합격") ||
-    text.includes("서류합격")
+    text.includes("서류합격") ||
+    text.includes("서류 전형") && text.includes("합격") ||
+    text.includes("서류") && text.includes("합격")
   ) return "서류합격";
 
   if (
@@ -107,7 +113,9 @@ export function classifyStatus(subject: string, snippet: string): string {
   if (
     text.includes("지원") ||
     text.includes("접수") ||
-    text.includes("apply")
+    text.includes("apply") ||
+    text.includes("application received") ||
+    text.includes("received your application")
   ) return "지원완료";
 
   return "기타";
