@@ -15,25 +15,23 @@ const ALLOWED_DOMAINS = [
   "wanted.co.kr",
   "getmiso.com",
   "jumpit.co.kr",
+  "greeting.works",
+  "workspear.com",
+  "rememberapp.co.kr",
 ];
 
-const LINKEDIN_KEYWORDS = [
-  "지원", "합격", "불합격", "면접", "채용", "입사", "전형", "서류",
+const JOB_KEYWORDS = [
+  "면접", "합격", "불합격", "탈락", "서류 전형", "채용", "인터뷰", "interview", "offer", "입사",
 ];
 
 const EXCLUDE_SUBJECTS = [
-  "(광고)", "[채용시작]", "추천 포지션", "님을 원하고",
-  "이력서를 열람", "공고가 마감", "마감되었습니다",
+  "이력서를 열람", "공고가 마감", "마감되었습니다", "추천 포지션",
+  "님을 원하고", "(광고)", "[채용시작]", "설명회", "채용박람회",
 ];
 
 function isAllowedSender(from: string, subject: string): boolean {
-  if (from.includes("newsletter.wantedlab.com")) return false;
-
-  if (from.includes("linkedin.com")) {
-    return LINKEDIN_KEYWORDS.some((kw) => subject.includes(kw));
-  }
-
-  return ALLOWED_DOMAINS.some((domain) => from.includes(domain));
+  if (ALLOWED_DOMAINS.some((domain) => from.includes(domain))) return true;
+  return JOB_KEYWORDS.some((kw) => subject.includes(kw));
 }
 
 function isExcludedSubject(subject: string): boolean {
@@ -47,7 +45,7 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
 
   const listRes = await gmail.users.messages.list({
     userId: "me",
-    q: "from:(saramin.co.kr OR wantedlab.com OR jobkorea.co.kr OR wanted.co.kr OR getmiso.com OR jumpit.co.kr OR linkedin.com) after:2025/06/21",
+    q: "subject:(면접 OR 합격 OR 불합격 OR 탈락 OR 서류 OR 채용 OR 인터뷰 OR interview OR offer OR 입사 OR 지원완료 OR 접수완료) after:2025/06/21",
     maxResults: 200,
   });
 
@@ -85,29 +83,33 @@ export function classifyStatus(subject: string, snippet: string): string {
 
   if (
     text.includes("아쉽게도") ||
-    text.includes("함께하지 못하게") ||
+    text.includes("함께하지 못") ||
     text.includes("불합격") ||
-    text.includes("탈락")
+    text.includes("탈락") ||
+    text.includes("어렵게 되었")
   ) return "불합격";
-
-  if (
-    text.includes("서류 전형에 합격") ||
-    text.includes("다음 전형") ||
-    text.includes("서류합격") ||
-    text.includes("서류 합격")
-  ) return "서류합격";
 
   if (
     text.includes("최종 합격") ||
     text.includes("합격을 축하") ||
-    text.includes("입사를 축하")
+    text.includes("입사를 축하") ||
+    text.includes("최종합격")
   ) return "최종합격";
+
+  if (
+    text.includes("서류 전형에 합격") ||
+    text.includes("서류합격") ||
+    text.includes("서류 합격") ||
+    text.includes("다음 전형")
+  ) return "서류합격";
 
   if (
     text.includes("면접 일정") ||
     text.includes("면접에 초대") ||
     text.includes("인터뷰") ||
-    text.includes("면접")
+    text.includes("면접 안내") ||
+    text.includes("1차 면접") ||
+    text.includes("비대면 면접")
   ) return "면접안내";
 
   if (
@@ -115,8 +117,7 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("입사지원이 완료") ||
     text.includes("성공적으로 완료") ||
     text.includes("접수 완료") ||
-    text.includes("지원") ||
-    text.includes("접수")
+    text.includes("지원 완료")
   ) return "지원완료";
 
   return "기타";
