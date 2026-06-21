@@ -21,7 +21,10 @@ const LINKEDIN_KEYWORDS = [
   "지원", "합격", "불합격", "면접", "채용", "입사", "전형", "서류",
 ];
 
-const EXCLUDE_SUBJECTS = ["(광고)", "[채용시작]", "추천 포지션", "님을 원하고"];
+const EXCLUDE_SUBJECTS = [
+  "(광고)", "[채용시작]", "추천 포지션", "님을 원하고",
+  "이력서를 열람", "공고가 마감", "마감되었습니다",
+];
 
 function isAllowedSender(from: string, subject: string): boolean {
   if (from.includes("newsletter.wantedlab.com")) return false;
@@ -44,8 +47,8 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
 
   const listRes = await gmail.users.messages.list({
     userId: "me",
-    q: "from:(saramin.co.kr OR wantedlab.com OR jobkorea.co.kr OR wanted.co.kr OR getmiso.com OR jumpit.co.kr OR linkedin.com)",
-    maxResults: 100,
+    q: "from:(saramin.co.kr OR wantedlab.com OR jobkorea.co.kr OR wanted.co.kr OR getmiso.com OR jumpit.co.kr OR linkedin.com) after:2025/06/21",
+    maxResults: 200,
   });
 
   const messages = listRes.data.messages || [];
@@ -65,6 +68,8 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
     const from = headers.find((h) => h.name === "From")?.value || "";
     const date = headers.find((h) => h.name === "Date")?.value || "";
     const snippet = detail.data.snippet || "";
+
+    console.log(`[gmail] subject: "${subject}" | from: ${from}`);
 
     if (!isAllowedSender(from, subject)) continue;
     if (isExcludedSubject(subject)) continue;
