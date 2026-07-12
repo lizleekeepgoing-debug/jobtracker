@@ -19,6 +19,13 @@ export async function GET() {
     return NextResponse.json({ emails: classified });
   } catch (error) {
     console.error("Gmail fetch error:", error);
+    const status = (error as { code?: number; status?: number })?.code ?? (error as { status?: number })?.status;
+    if (status === 403) {
+      return NextResponse.json(
+        { error: "Gmail 접근 권한(gmail.readonly 스코프)이 없습니다. 로그아웃 후 다시 로그인해주세요." },
+        { status: 403 }
+      );
+    }
     return NextResponse.json({ error: "Failed to fetch emails" }, { status: 500 });
   }
 }

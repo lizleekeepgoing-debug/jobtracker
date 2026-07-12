@@ -25,17 +25,20 @@ export default function Home() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("전체");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (session) {
       setLoading(true);
+      setError(null);
       fetch("/api/gmail")
-        .then((r) => r.json())
-        .then((data) => {
+        .then(async (r) => {
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || "Failed to fetch emails");
           setEmails(data.emails || []);
-          setLoading(false);
         })
-        .catch(() => setLoading(false));
+        .catch((e) => setError(e.message))
+        .finally(() => setLoading(false));
     }
   }, [session]);
 
@@ -103,6 +106,8 @@ export default function Home() {
         </div>
         {loading ? (
           <div className="text-center text-gray-400 py-20">이메일 불러오는 중...</div>
+        ) : error ? (
+          <div className="text-center text-red-500 py-20">{error}</div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-gray-400 py-20">해당하는 이메일이 없어요.</div>
         ) : (
