@@ -22,20 +22,20 @@ const STATUS_COLORS: Record<string, string> = {
 
 const POINT_COLORS: Record<string, string> = {
   지원완료: "bg-yellow-400",
-  서류합격: "bg-blue-400",
   면접안내: "bg-purple-400",
-  최종합격: "bg-green-400",
+  합격: "bg-green-400",
   불합격: "bg-red-400",
 };
 
 const FILTER_ACTIVE_COLORS: Record<string, string> = {
   전체: "bg-white text-slate-900",
   지원완료: "bg-yellow-400/80 text-yellow-900",
-  서류합격: "bg-blue-400/80 text-white",
   면접안내: "bg-purple-400/80 text-white",
-  최종합격: "bg-green-400/80 text-white",
+  합격: "bg-green-400/80 text-white",
   불합격: "bg-red-400/80 text-white",
 };
+
+const PASS_STATUSES = ["서류합격", "최종합격"];
 
 function parseFrom(from: string): { name: string; domain: string } {
   const match = from.match(/^(.*?)<(.+)>$/);
@@ -91,14 +91,18 @@ export default function Home() {
     );
   }
 
-  const statuses = ["전체", "지원완료", "서류합격", "면접안내", "최종합격", "불합격"];
+  const statuses = ["전체", "지원완료", "면접안내", "합격", "불합격"];
   const filtered = filter === "전체"
     ? emails.filter((e) => e.status !== "기타")
+    : filter === "합격"
+    ? emails.filter((e) => PASS_STATUSES.includes(e.status))
     : emails.filter((e) => e.status === filter);
 
   const counts: Record<string, number> = {};
   statuses.slice(1).forEach((s) => {
-    counts[s] = emails.filter((e) => e.status === s).length;
+    counts[s] = s === "합격"
+      ? emails.filter((e) => PASS_STATUSES.includes(e.status)).length
+      : emails.filter((e) => e.status === s).length;
   });
 
   return (
@@ -113,7 +117,7 @@ export default function Home() {
         </div>
       </header>
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-4 gap-3 mb-8">
           {statuses.slice(1).map((s) => (
             <div key={s} className="relative overflow-hidden bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center">
               <div className={`absolute top-0 left-0 right-0 h-1 ${POINT_COLORS[s]}`} />
