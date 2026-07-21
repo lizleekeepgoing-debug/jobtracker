@@ -11,31 +11,22 @@ interface Email {
   status: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  불합격: "bg-red-400/20 text-red-200",
-  최종합격: "bg-green-400/20 text-green-200",
-  서류합격: "bg-blue-400/20 text-blue-200",
-  면접안내: "bg-purple-400/20 text-purple-200",
-  지원완료: "bg-yellow-400/20 text-yellow-200",
-  기타: "bg-white/10 text-white/40",
-};
-
-const POINT_COLORS: Record<string, string> = {
-  지원완료: "bg-yellow-400",
-  서류합격: "bg-blue-400",
-  면접안내: "bg-purple-400",
-  최종합격: "bg-green-400",
-  불합격: "bg-red-400",
-};
-
-const FILTER_ACTIVE_COLORS: Record<string, string> = {
-  전체: "bg-white text-slate-900",
+const STATUS_STYLES: Record<string, string> = {
   지원완료: "bg-yellow-400/80 text-yellow-900",
-  서류합격: "bg-blue-400/80 text-white",
   면접안내: "bg-purple-400/80 text-white",
-  최종합격: "bg-green-400/80 text-white",
+  합격: "bg-green-400/80 text-white",
   불합격: "bg-red-400/80 text-white",
 };
+
+const COUNT_TEXT_COLORS: Record<string, string> = {
+  지원완료: "text-yellow-400",
+  면접안내: "text-purple-400",
+  합격: "text-green-400",
+  불합격: "text-red-400",
+};
+
+const YEARS = ["전체", "2024", "2025", "2026"];
+const MONTHS = ["전체", ...Array.from({ length: 12 }, (_, i) => String(i + 1))];
 
 function parseFrom(from: string): { name: string; domain: string } {
   const match = from.match(/^(.*?)<(.+)>$/);
@@ -53,6 +44,8 @@ export default function Home() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("전체");
+  const [year, setYear] = useState("전체");
+  const [month, setMonth] = useState("전체");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,14 +84,22 @@ export default function Home() {
     );
   }
 
-  const statuses = ["전체", "지원완료", "서류합격", "면접안내", "최종합격", "불합격"];
+  const statuses = ["전체", "지원완료", "면접안내", "합격", "불합격"];
+
+  const dateFiltered = emails.filter((e) => {
+    const d = new Date(e.date);
+    if (year !== "전체" && d.getFullYear() !== Number(year)) return false;
+    if (month !== "전체" && d.getMonth() + 1 !== Number(month)) return false;
+    return true;
+  });
+
   const filtered = filter === "전체"
-    ? emails.filter((e) => e.status !== "기타")
-    : emails.filter((e) => e.status === filter);
+    ? dateFiltered.filter((e) => e.status !== "기타")
+    : dateFiltered.filter((e) => e.status === filter);
 
   const counts: Record<string, number> = {};
   statuses.slice(1).forEach((s) => {
-    counts[s] = emails.filter((e) => e.status === s).length;
+    counts[s] = dateFiltered.filter((e) => e.status === s).length;
   });
 
   return (
@@ -113,18 +114,43 @@ export default function Home() {
         </div>
       </header>
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-4 gap-3 mb-8">
           {statuses.slice(1).map((s) => (
-            <div key={s} className="relative overflow-hidden bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center">
-              <div className={`absolute top-0 left-0 right-0 h-1 ${POINT_COLORS[s]}`} />
-              <div className="text-2xl font-bold text-white">{counts[s] || 0}</div>
+            <div key={s} className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center">
+              <div className={`text-2xl font-bold ${COUNT_TEXT_COLORS[s]}`}>{counts[s] || 0}</div>
               <div className="text-xs text-white/60 mt-1">{s}</div>
             </div>
           ))}
         </div>
 
         <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5">
-          <h2 className="text-white font-semibold mb-4">지원 현황</h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h2 className="text-white font-semibold">지원 현황</h2>
+            <div className="flex gap-2">
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className="bg-white/10 border border-white/20 text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none"
+              >
+                {YEARS.map((y) => (
+                  <option key={y} value={y} className="bg-slate-800 text-white">
+                    {y === "전체" ? "전체" : `${y}년`}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="bg-white/10 border border-white/20 text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none"
+              >
+                {MONTHS.map((m) => (
+                  <option key={m} value={m} className="bg-slate-800 text-white">
+                    {m === "전체" ? "전체" : `${m}월`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="flex gap-2 mb-6 flex-wrap">
             {statuses.map((s) => (
               <button
@@ -132,7 +158,7 @@ export default function Home() {
                 onClick={() => setFilter(s)}
                 className={`px-4 py-1.5 rounded-full text-sm transition border ${
                   filter === s
-                    ? `${FILTER_ACTIVE_COLORS[s]} border-transparent`
+                    ? `${s === "전체" ? "bg-white text-slate-900" : STATUS_STYLES[s]} border-transparent`
                     : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
                 }`}
               >
@@ -165,7 +191,7 @@ export default function Home() {
                         <p className="text-sm text-white/60 mt-2 line-clamp-2">{email.snippet}</p>
                       </div>
                       <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[email.status]}`}>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_STYLES[email.status]}`}>
                           {email.status}
                         </span>
                         <span className="text-xs text-white/50">

@@ -26,9 +26,9 @@ const JOB_KEYWORDS = [
 ];
 
 const EXCLUDE_KEYWORDS = [
-  "(광고)", "[채용시작]", "추천 포지션", "원티드 고객센터", "이력서를 열람",
+  "(광고)", "[채용시작]", "추천 포지션", "이력서를 열람",
   "공고가 마감", "마감되었습니다", "설문하고 스타벅스", "취업축하금 신청",
-  "포인트 정책 변경", "채용 진행 상황 확인 요청드립니다", "님을 원하고",
+  "포인트 정책 변경", "정책 변경 안내", "채용 진행 상황 확인 요청드립니다", "님을 원하고",
   "설명회", "채용박람회",
 ];
 
@@ -44,8 +44,8 @@ function isExcludedByKeyword(subject: string, snippet: string): boolean {
   return EXCLUDE_KEYWORDS.some((kw) => text.includes(kw));
 }
 
-function isExcludedSender(from: string): boolean {
-  return EXCLUDED_SENDERS.some((addr) => from.includes(addr));
+function isWantedCsSender(from: string): boolean {
+  return from.includes("원티드 고객센터") || EXCLUDED_SENDERS.some((addr) => from.includes(addr));
 }
 
 function isWantedCsApplicationComplete(subject: string, snippet: string): boolean {
@@ -87,9 +87,7 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
 
     console.log(`[gmail] subject: "${subject}" | from: ${from}`);
 
-    const fromIsWantedCs = from.includes("원티드 고객센터") || isExcludedSender(from);
-
-    if (fromIsWantedCs) {
+    if (isWantedCsSender(from)) {
       if (!isWantedCsApplicationComplete(subject, snippet)) continue;
       results.push({ id: msg.id, subject, from, date, snippet, forcedStatus: "지원완료" });
       continue;
@@ -108,6 +106,20 @@ export function classifyStatus(subject: string, snippet: string): string {
   const text = (subject + " " + snippet).toLowerCase();
 
   if (
+    text.includes("입사지원이 성공적으로 완료") ||
+    text.includes("입사지원이 완료") ||
+    text.includes("지원이 완료되었습니다") ||
+    text.includes("지원이 완료") ||
+    text.includes("지원완료") ||
+    text.includes("입사지원 완료") ||
+    text.includes("지원되었습니다") ||
+    text.includes("접수되었습니다") ||
+    text.includes("지원 완료") ||
+    text.includes("접수 완료") ||
+    text.includes("지원해 주셔서")
+  ) return "지원완료";
+
+  if (
     text.includes("불합격") ||
     text.includes("탈락") ||
     text.includes("아쉽게도") ||
@@ -115,6 +127,7 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("함께하지 못") ||
     text.includes("모시지 못하게") ||
     text.includes("어렵게 되었") ||
+    text.includes("제한된 인원으로 인해") ||
     text.includes("함께할 수 없") ||
     text.includes("이번 기회에는") ||
     text.includes("안타깝게도") ||
@@ -147,21 +160,6 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("인터뷰") ||
     text.includes("interview")
   ) return "면접안내";
-
-  if (
-    text.includes("지원이 완료") ||
-    text.includes("입사지원이 완료") ||
-    text.includes("입사지원이 성공적으로 완료") ||
-    text.includes("지원완료") ||
-    text.includes("입사지원 완료") ||
-    text.includes("지원되었습니다") ||
-    text.includes("접수되었습니다") ||
-    text.includes("지원 완료") ||
-    text.includes("접수 완료") ||
-    text.includes("성공적으로 완료") ||
-    text.includes("지원해 주셔서") ||
-    text.includes("지원이 완료되었습니다")
-  ) return "지원완료";
 
   return "기타";
 }
