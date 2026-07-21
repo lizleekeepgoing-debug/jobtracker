@@ -12,13 +12,41 @@ interface Email {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  불합격: "bg-red-100 text-red-700",
-  최종합격: "bg-green-100 text-green-700",
-  서류합격: "bg-blue-100 text-blue-700",
-  면접안내: "bg-yellow-100 text-yellow-700",
-  지원완료: "bg-gray-100 text-gray-700",
-  기타: "bg-gray-50 text-gray-400",
+  불합격: "bg-red-400/20 text-red-200",
+  최종합격: "bg-green-400/20 text-green-200",
+  서류합격: "bg-blue-400/20 text-blue-200",
+  면접안내: "bg-purple-400/20 text-purple-200",
+  지원완료: "bg-yellow-400/20 text-yellow-200",
+  기타: "bg-white/10 text-white/40",
 };
+
+const POINT_COLORS: Record<string, string> = {
+  지원완료: "bg-yellow-400",
+  서류합격: "bg-blue-400",
+  면접안내: "bg-purple-400",
+  최종합격: "bg-green-400",
+  불합격: "bg-red-400",
+};
+
+const FILTER_ACTIVE_COLORS: Record<string, string> = {
+  전체: "bg-white text-slate-900",
+  지원완료: "bg-yellow-400/80 text-yellow-900",
+  서류합격: "bg-blue-400/80 text-white",
+  면접안내: "bg-purple-400/80 text-white",
+  최종합격: "bg-green-400/80 text-white",
+  불합격: "bg-red-400/80 text-white",
+};
+
+function parseFrom(from: string): { name: string; domain: string } {
+  const match = from.match(/^(.*?)<(.+)>$/);
+  if (!match) {
+    return { name: from, domain: "" };
+  }
+  const name = match[1].trim().replace(/^"|"$/g, "");
+  const email = match[2].trim();
+  const domain = email.split("@")[1] || "";
+  return { name: name || email, domain };
+}
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -43,20 +71,22 @@ export default function Home() {
   }, [session]);
 
   if (status === "loading") {
-    return <div className="flex items-center justify-center min-h-screen text-gray-500">로딩 중...</div>;
+    return <div className="flex items-center justify-center min-h-screen text-white/70">로딩 중...</div>;
   }
 
   if (!session) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-6 bg-gray-50">
-        <h1 className="text-3xl font-bold text-gray-800">구직 활동 트래커</h1>
-        <p className="text-gray-500">Gmail을 연동해서 지원 현황을 한눈에 확인하세요.</p>
-        <button
-          onClick={() => signIn("google")}
-          className="px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition"
-        >
-          Google로 시작하기
-        </button>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-4">
+        <div className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-10 flex flex-col items-center gap-6 text-center">
+          <h1 className="text-3xl font-bold text-white">구직 활동 트래커</h1>
+          <p className="text-white/70">Gmail을 연동해서 지원 현황을 한눈에 확인하세요.</p>
+          <button
+            onClick={() => signIn("google")}
+            className="px-6 py-3 bg-white text-slate-900 rounded-lg font-medium hover:bg-white/90 transition"
+          >
+            Google로 시작하기
+          </button>
+        </div>
       </div>
     );
   }
@@ -72,12 +102,12 @@ export default function Home() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">구직 활동 트래커</h1>
+    <div className="min-h-screen">
+      <header className="bg-white/5 border-b border-white/10 px-6 py-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-white">구직 활동 트래커</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">{session.user?.email}</span>
-          <button onClick={() => signOut()} className="text-sm text-gray-400 hover:text-gray-600">
+          <span className="text-sm text-white/70">{session.user?.email}</span>
+          <button onClick={() => signOut()} className="text-sm text-white/50 hover:text-white transition">
             로그아웃
           </button>
         </div>
@@ -85,54 +115,70 @@ export default function Home() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="grid grid-cols-5 gap-3 mb-8">
           {statuses.slice(1).map((s) => (
-            <div key={s} className="bg-white rounded-xl p-4 text-center shadow-sm">
-              <div className="text-2xl font-bold text-gray-800">{counts[s] || 0}</div>
-              <div className="text-xs text-gray-500 mt-1">{s}</div>
+            <div key={s} className="relative overflow-hidden bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 text-center">
+              <div className={`absolute top-0 left-0 right-0 h-1 ${POINT_COLORS[s]}`} />
+              <div className="text-2xl font-bold text-white">{counts[s] || 0}</div>
+              <div className="text-xs text-white/60 mt-1">{s}</div>
             </div>
           ))}
         </div>
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {statuses.map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`px-4 py-1.5 rounded-full text-sm transition ${
-                filter === s ? "bg-black text-white" : "bg-white text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        {loading ? (
-          <div className="text-center text-gray-400 py-20">이메일 불러오는 중...</div>
-        ) : error ? (
-          <div className="text-center text-red-500 py-20">{error}</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center text-gray-400 py-20">해당하는 이메일이 없어요.</div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((email) => (
-              <div key={email.id} className="bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-800 truncate">{email.subject}</p>
-                    <p className="text-sm text-gray-400 mt-1">{email.from}</p>
-                    <p className="text-sm text-gray-500 mt-2 line-clamp-2">{email.snippet}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[email.status]}`}>
-                      {email.status}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(email.date).toLocaleDateString("ko-KR")}
-                    </span>
-                  </div>
-                </div>
-              </div>
+
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5">
+          <h2 className="text-white font-semibold mb-4">지원 현황</h2>
+          <div className="flex gap-2 mb-6 flex-wrap">
+            {statuses.map((s) => (
+              <button
+                key={s}
+                onClick={() => setFilter(s)}
+                className={`px-4 py-1.5 rounded-full text-sm transition border ${
+                  filter === s
+                    ? `${FILTER_ACTIVE_COLORS[s]} border-transparent`
+                    : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                }`}
+              >
+                {s}
+              </button>
             ))}
           </div>
-        )}
+          {loading ? (
+            <div className="text-center text-white/50 py-20">이메일 불러오는 중...</div>
+          ) : error ? (
+            <div className="text-center text-red-300 py-20">{error}</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center text-white/50 py-20">해당하는 이메일이 없어요.</div>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((email) => {
+                const { name, domain } = parseFrom(email.from);
+                return (
+                  <div
+                    key={email.id}
+                    className="bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:bg-white/15 transition"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white/90 truncate">{email.subject}</p>
+                        <p className="text-sm mt-1">
+                          <span className="text-white">{name}</span>
+                          {domain && <span className="text-white/50"> · {domain}</span>}
+                        </p>
+                        <p className="text-sm text-white/60 mt-2 line-clamp-2">{email.snippet}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[email.status]}`}>
+                          {email.status}
+                        </span>
+                        <span className="text-xs text-white/50">
+                          {new Date(email.date).toLocaleDateString("ko-KR")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
