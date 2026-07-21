@@ -25,7 +25,6 @@ const COUNT_TEXT_COLORS: Record<string, string> = {
   불합격: "text-red-400",
 };
 
-const YEARS = ["전체", "2024", "2025", "2026"];
 const MONTHS = ["전체", ...Array.from({ length: 12 }, (_, i) => String(i + 1))];
 
 function parseFrom(from: string): { name: string; domain: string } {
@@ -105,6 +104,11 @@ export default function Home() {
 
   const statuses = ["전체", "지원완료", "면접안내", "합격", "불합격"];
 
+  const availableYears = Array.from(
+    new Set(emails.map((e) => new Date(e.date).getFullYear()))
+  ).sort((a, b) => b - a);
+  const yearOptions = ["전체", ...availableYears.map(String)];
+
   const dateFiltered = emails.filter((e) => {
     const d = new Date(e.date);
     if (year !== "전체" && d.getFullYear() !== Number(year)) return false;
@@ -179,7 +183,7 @@ export default function Home() {
                   onChange={(e) => setYear(e.target.value)}
                   className="appearance-none bg-white/10 border border-white/20 text-white rounded-full pl-4 pr-8 py-1.5 text-sm focus:outline-none"
                 >
-                  {YEARS.map((y) => (
+                  {yearOptions.map((y) => (
                     <option key={y} value={y} className="bg-slate-800 text-white">
                       {y === "전체" ? "전체 연도" : `${y}년`}
                     </option>

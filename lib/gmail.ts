@@ -56,47 +56,75 @@ function isWantedCsApplicationComplete(subject: string, snippet: string): boolea
   );
 }
 
+const MAX_PAGES = 3;
+const MAX_TOTAL_MESSAGES = 500;
+const DETAIL_BATCH_SIZE = 20;
+
+type GmailClient = ReturnType<typeof google.gmail>;
+
+async function fetchMessageDetail(gmail: GmailClient, messageId: string): Promise<EmailData | null> {
+  const detail = await gmail.users.messages.get({
+    userId: "me",
+    id: messageId,
+    format: "metadata",
+    metadataHeaders: ["Subject", "From", "Date"],
+  });
+
+  const headers = detail.data.payload?.headers || [];
+  const subject = headers.find((h) => h.name === "Subject")?.value || "";
+  const from = headers.find((h) => h.name === "From")?.value || "";
+  const date = headers.find((h) => h.name === "Date")?.value || "";
+  const snippet = detail.data.snippet || "";
+
+  console.log(`[gmail] subject: "${subject}" | from: ${from}`);
+
+  if (isWantedCsSender(from)) {
+    if (!isWantedCsApplicationComplete(subject, snippet)) return null;
+    return { id: messageId, subject, from, date, snippet, forcedStatus: "지원완료" };
+  }
+
+  if (!isAllowedSender(from, subject)) return null;
+  if (isExcludedByKeyword(subject, snippet)) return null;
+
+  return { id: messageId, subject, from, date, snippet };
+}
+
 export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> {
   const auth = new google.auth.OAuth2();
   auth.setCredentials({ access_token: accessToken });
   const gmail = google.gmail({ version: "v1", auth });
 
-  const listRes = await gmail.users.messages.list({
-    userId: "me",
-    q: "subject:(면접 OR 합격 OR 불합격 OR 탈락 OR 서류 OR 채용 OR 인터뷰 OR interview OR offer OR 입사 OR 지원완료 OR 접수완료) after:2025/07/21",
-    maxResults: 200,
-  });
+  const query =
+    "subject:(면접 OR 합격 OR 불합격 OR 탈락 OR 서류 OR 채용 OR 인터뷰 OR interview OR offer OR 입사 OR 지원완료 OR 접수완료)";
 
-  const messages = listRes.data.messages || [];
-  const results: EmailData[] = [];
+  let pageToken: string | undefined;
+  const messageStubs: { id: string }[] = [];
 
-  for (const msg of messages) {
-    if (!msg.id) continue;
-    const detail = await gmail.users.messages.get({
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const listRes = await gmail.users.messages.list({
       userId: "me",
-      id: msg.id,
-      format: "metadata",
-      metadataHeaders: ["Subject", "From", "Date"],
+      q: query,
+      maxResults: 500,
+      pageToken,
     });
 
-    const headers = detail.data.payload?.headers || [];
-    const subject = headers.find((h) => h.name === "Subject")?.value || "";
-    const from = headers.find((h) => h.name === "From")?.value || "";
-    const date = headers.find((h) => h.name === "Date")?.value || "";
-    const snippet = detail.data.snippet || "";
-
-    console.log(`[gmail] subject: "${subject}" | from: ${from}`);
-
-    if (isWantedCsSender(from)) {
-      if (!isWantedCsApplicationComplete(subject, snippet)) continue;
-      results.push({ id: msg.id, subject, from, date, snippet, forcedStatus: "지원완료" });
-      continue;
+    for (const msg of listRes.data.messages || []) {
+      if (msg.id) messageStubs.push({ id: msg.id });
     }
 
-    if (!isAllowedSender(from, subject)) continue;
-    if (isExcludedByKeyword(subject, snippet)) continue;
+    pageToken = listRes.data.nextPageToken || undefined;
+    if (!pageToken || messageStubs.length >= MAX_TOTAL_MESSAGES) break;
+  }
 
-    results.push({ id: msg.id, subject, from, date, snippet });
+  const messages = messageStubs.slice(0, MAX_TOTAL_MESSAGES);
+  const results: EmailData[] = [];
+
+  for (let i = 0; i < messages.length; i += DETAIL_BATCH_SIZE) {
+    const batch = messages.slice(i, i + DETAIL_BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map((msg) => fetchMessageDetail(gmail, msg.id)));
+    for (const email of batchResults) {
+      if (email) results.push(email);
+    }
   }
 
   return results;
