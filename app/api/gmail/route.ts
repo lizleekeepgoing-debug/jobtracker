@@ -14,7 +14,7 @@ export async function GET() {
     const emails = await fetchJobEmails(session.accessToken as string);
     const classified = emails.map((email) => ({
       ...email,
-      status: classifyStatus(email.subject, email.snippet),
+      status: email.forcedStatus || classifyStatus(email.subject, email.snippet),
     }));
     return NextResponse.json({ emails: classified });
   } catch (error) {

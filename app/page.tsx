@@ -12,11 +12,10 @@ interface Email {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  불합격: "bg-red-400/20 text-red-200",
-  최종합격: "bg-green-400/20 text-green-200",
-  서류합격: "bg-blue-400/20 text-blue-200",
-  면접안내: "bg-purple-400/20 text-purple-200",
-  지원완료: "bg-yellow-400/20 text-yellow-200",
+  합격: "bg-green-400/80 text-white",
+  불합격: "bg-red-400/80 text-white",
+  면접안내: "bg-purple-400/80 text-white",
+  지원완료: "bg-yellow-400/80 text-yellow-900",
   기타: "bg-white/10 text-white/40",
 };
 
@@ -35,7 +34,8 @@ const FILTER_ACTIVE_COLORS: Record<string, string> = {
   불합격: "bg-red-400/80 text-white",
 };
 
-const PASS_STATUSES = ["서류합격", "최종합격"];
+const YEARS = ["전체", "2024", "2025", "2026"];
+const MONTHS = ["전체", ...Array.from({ length: 12 }, (_, i) => String(i + 1))];
 
 function parseFrom(from: string): { name: string; domain: string } {
   const match = from.match(/^(.*?)<(.+)>$/);
@@ -53,6 +53,8 @@ export default function Home() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("전체");
+  const [year, setYear] = useState("전체");
+  const [month, setMonth] = useState("전체");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,17 +94,21 @@ export default function Home() {
   }
 
   const statuses = ["전체", "지원완료", "면접안내", "합격", "불합격"];
+
+  const dateFiltered = emails.filter((e) => {
+    const d = new Date(e.date);
+    if (year !== "전체" && d.getFullYear() !== Number(year)) return false;
+    if (month !== "전체" && d.getMonth() + 1 !== Number(month)) return false;
+    return true;
+  });
+
   const filtered = filter === "전체"
-    ? emails.filter((e) => e.status !== "기타")
-    : filter === "합격"
-    ? emails.filter((e) => PASS_STATUSES.includes(e.status))
-    : emails.filter((e) => e.status === filter);
+    ? dateFiltered.filter((e) => e.status !== "기타")
+    : dateFiltered.filter((e) => e.status === filter);
 
   const counts: Record<string, number> = {};
   statuses.slice(1).forEach((s) => {
-    counts[s] = s === "합격"
-      ? emails.filter((e) => PASS_STATUSES.includes(e.status)).length
-      : emails.filter((e) => e.status === s).length;
+    counts[s] = dateFiltered.filter((e) => e.status === s).length;
   });
 
   return (
@@ -128,7 +134,33 @@ export default function Home() {
         </div>
 
         <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5">
-          <h2 className="text-white font-semibold mb-4">지원 현황</h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h2 className="text-white font-semibold">지원 현황</h2>
+            <div className="flex gap-2">
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className="bg-white/10 border border-white/20 text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none"
+              >
+                {YEARS.map((y) => (
+                  <option key={y} value={y} className="bg-slate-800 text-white">
+                    {y === "전체" ? "전체" : `${y}년`}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="bg-white/10 border border-white/20 text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none"
+              >
+                {MONTHS.map((m) => (
+                  <option key={m} value={m} className="bg-slate-800 text-white">
+                    {m === "전체" ? "전체" : `${m}월`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="flex gap-2 mb-6 flex-wrap">
             {statuses.map((s) => (
               <button
