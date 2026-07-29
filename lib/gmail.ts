@@ -6,7 +6,6 @@ export interface EmailData {
   from: string;
   date: string;
   snippet: string;
-  forcedStatus?: string;
 }
 
 const ALLOWED_DOMAINS = [
@@ -17,23 +16,24 @@ const ALLOWED_DOMAINS = [
   "getmiso.com",
   "jumpit.co.kr",
   "greeting.works",
+  "greetinghr.com",
   "workspear.com",
   "rememberapp.co.kr",
+  "linkedin.com",
 ];
 
 const JOB_KEYWORDS = [
-  "면접", "합격", "불합격", "탈락", "서류", "전형", "채용", "인터뷰", "interview", "offer",
-  "입사", "지원", "접수", "축하", "환영", "결과",
+  "면접", "합격", "불합격", "탈락", "서류", "채용", "인터뷰", "interview", "offer", "입사",
+];
+
+const SUBJECT_QUERY_KEYWORDS = [
+  "면접", "합격", "불합격", "탈락", "서류전형", "채용결과", "인터뷰", "interview", "offer",
 ];
 
 const EXCLUDE_KEYWORDS = [
-  "(광고)", "[채용시작]", "추천 포지션", "이력서를 열람",
-  "공고가 마감", "마감되었습니다", "설문하고 스타벅스", "취업축하금 신청",
-  "포인트 정책 변경", "정책 변경 안내", "채용 진행 상황 확인 요청드립니다", "님을 원하고",
-  "설명회", "채용박람회",
+  "이력서를 열람", "공고가 마감", "마감되었습니다", "설문하고 스타벅스", "취업축하금",
+  "포인트 정책", "채용 진행 상황 확인 요청", "님을 원하고", "설명회", "채용박람회", "추천 포지션",
 ];
-
-const EXCLUDED_SENDERS = ["cs@wantedlab.com", "no-reply@wantedlab.com"];
 
 function isAllowedSender(from: string, subject: string): boolean {
   if (ALLOWED_DOMAINS.some((domain) => from.includes(domain))) return true;
@@ -43,18 +43,6 @@ function isAllowedSender(from: string, subject: string): boolean {
 function isExcludedByKeyword(subject: string, snippet: string): boolean {
   const text = subject + " " + snippet;
   return EXCLUDE_KEYWORDS.some((kw) => text.includes(kw));
-}
-
-function isWantedCsSender(from: string): boolean {
-  return from.includes("원티드 고객센터") || EXCLUDED_SENDERS.some((addr) => from.includes(addr));
-}
-
-function isWantedCsApplicationComplete(subject: string, snippet: string): boolean {
-  const text = subject + " " + snippet;
-  return (
-    subject.includes("[원티드]") &&
-    (text.includes("지원이 완료") || text.includes("지원완료") || text.includes("완료되었습니다"))
-  );
 }
 
 const MAX_PAGES = 3;
@@ -102,10 +90,6 @@ async function fetchMessageDetail(gmail: GmailClient, messageId: string): Promis
 
   console.log(`[gmail] subject: "${subject}" | from: ${from}`);
 
-  if (isWantedCsSender(from) && isWantedCsApplicationComplete(subject, snippet)) {
-    return { id: messageId, subject, from, date, snippet, forcedStatus: "지원완료" };
-  }
-
   if (!isAllowedSender(from, subject)) return null;
   if (isExcludedByKeyword(subject, snippet)) return null;
 
@@ -118,7 +102,7 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
   const gmail = google.gmail({ version: "v1", auth });
 
   const domainQuery = `from:(${ALLOWED_DOMAINS.join(" OR ")})`;
-  const subjectQuery = `subject:(${JOB_KEYWORDS.join(" OR ")})`;
+  const subjectQuery = `subject:(${SUBJECT_QUERY_KEYWORDS.join(" OR ")})`;
 
   const [domainIds, subjectIds] = await Promise.all([
     listMessageIds(gmail, domainQuery),
@@ -157,8 +141,7 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("접수되었습니다") ||
     text.includes("지원 완료") ||
     text.includes("접수 완료") ||
-    text.includes("지원해 주셔서") ||
-    text.includes("지원해주셔서")
+    text.includes("지원해 주셔서")
   ) return "지원완료";
 
   if (
@@ -173,7 +156,7 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("함께할 수 없") ||
     text.includes("이번 기회에는") ||
     text.includes("안타깝게도") ||
-    text.includes("함께 진행하지 못하게 되었음을")
+    text.includes("함께 진행하지 못")
   ) return "불합격";
 
   if (
@@ -186,9 +169,7 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("서류 합격") ||
     text.includes("서류합격") ||
     text.includes("서류 전형에 합격") ||
-    text.includes("서류전형에 합격") ||
     text.includes("다음 전형") ||
-    text.includes("면접 합격") ||
     text.includes("입사를 환영") ||
     text.includes("환영합니다")
   ) return "합격";
