@@ -102,8 +102,7 @@ async function fetchMessageDetail(gmail: GmailClient, messageId: string): Promis
 
   console.log(`[gmail] subject: "${subject}" | from: ${from}`);
 
-  if (isWantedCsSender(from)) {
-    if (!isWantedCsApplicationComplete(subject, snippet)) return null;
+  if (isWantedCsSender(from) && isWantedCsApplicationComplete(subject, snippet)) {
     return { id: messageId, subject, from, date, snippet, forcedStatus: "지원완료" };
   }
 

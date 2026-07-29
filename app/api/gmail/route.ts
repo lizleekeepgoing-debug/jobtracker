@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { fetchJobEmails, classifyStatus } from "@/lib/gmail";
 
+export const maxDuration = 60;
+
 export async function GET() {
   const session = await getServerSession(authOptions);
 
