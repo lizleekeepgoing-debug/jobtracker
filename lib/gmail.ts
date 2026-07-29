@@ -63,6 +63,29 @@ const DETAIL_BATCH_SIZE = 20;
 
 type GmailClient = ReturnType<typeof google.gmail>;
 
+async function listMessageIds(gmail: GmailClient, query: string): Promise<string[]> {
+  let pageToken: string | undefined;
+  const ids: string[] = [];
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const listRes = await gmail.users.messages.list({
+      userId: "me",
+      q: query,
+      maxResults: 500,
+      pageToken,
+    });
+
+    for (const msg of listRes.data.messages || []) {
+      if (msg.id) ids.push(msg.id);
+    }
+
+    pageToken = listRes.data.nextPageToken || undefined;
+    if (!pageToken || ids.length >= MAX_TOTAL_MESSAGES) break;
+  }
+
+  return ids;
+}
+
 async function fetchMessageDetail(gmail: GmailClient, messageId: string): Promise<EmailData | null> {
   const detail = await gmail.users.messages.get({
     userId: "me",
@@ -95,39 +118,28 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
   auth.setCredentials({ access_token: accessToken });
   const gmail = google.gmail({ version: "v1", auth });
 
-  const query =
-    "(from:(saramin.co.kr OR wantedlab.com OR jobkorea.co.kr OR wanted.co.kr OR getmiso.com OR jumpit.co.kr OR greeting.works OR workspear.com OR rememberapp.co.kr) " +
-    "OR subject:(면접 OR 합격 OR 불합격 OR 탈락 OR 서류 OR 전형 OR 채용 OR 인터뷰 OR interview OR offer OR 입사 OR 지원 OR 접수 OR 축하 OR 환영 OR 결과))";
+  const domainQuery = `from:(${ALLOWED_DOMAINS.join(" OR ")})`;
+  const subjectQuery = `subject:(${JOB_KEYWORDS.join(" OR ")})`;
 
-  let pageToken: string | undefined;
-  const messageStubs: { id: string }[] = [];
+  const [domainIds, subjectIds] = await Promise.all([
+    listMessageIds(gmail, domainQuery),
+    listMessageIds(gmail, subjectQuery),
+  ]);
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const listRes = await gmail.users.messages.list({
-      userId: "me",
-      q: query,
-      maxResults: 500,
-      pageToken,
-    });
+  console.log(`[gmail] domain matches: ${domainIds.length}, subject matches: ${subjectIds.length}`);
 
-    for (const msg of listRes.data.messages || []) {
-      if (msg.id) messageStubs.push({ id: msg.id });
-    }
-
-    pageToken = listRes.data.nextPageToken || undefined;
-    if (!pageToken || messageStubs.length >= MAX_TOTAL_MESSAGES) break;
-  }
-
-  const messages = messageStubs.slice(0, MAX_TOTAL_MESSAGES);
+  const messageIds = Array.from(new Set([...domainIds, ...subjectIds])).slice(0, MAX_TOTAL_MESSAGES);
   const results: EmailData[] = [];
 
-  for (let i = 0; i < messages.length; i += DETAIL_BATCH_SIZE) {
-    const batch = messages.slice(i, i + DETAIL_BATCH_SIZE);
-    const batchResults = await Promise.all(batch.map((msg) => fetchMessageDetail(gmail, msg.id)));
+  for (let i = 0; i < messageIds.length; i += DETAIL_BATCH_SIZE) {
+    const batch = messageIds.slice(i, i + DETAIL_BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map((id) => fetchMessageDetail(gmail, id)));
     for (const email of batchResults) {
       if (email) results.push(email);
     }
   }
+
+  console.log(`[gmail] fetched ${messageIds.length} candidates, kept ${results.length} after filtering`);
 
   return results;
 }
