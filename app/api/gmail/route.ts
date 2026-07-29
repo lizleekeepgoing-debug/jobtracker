@@ -21,10 +21,23 @@ export async function GET() {
     return NextResponse.json({ emails: classified });
   } catch (error) {
     console.error("Gmail fetch error:", error);
-    const status = (error as { code?: number; status?: number })?.code ?? (error as { status?: number })?.status;
+
+    const err = error as {
+      code?: number;
+      status?: number;
+      message?: string;
+      response?: { data?: unknown };
+    };
+    const status = err.code ?? err.status;
+
     if (status === 403) {
+      const googleError = err.response?.data ?? err.message ?? String(error);
+      console.error("Gmail 403 response body:", JSON.stringify(googleError, null, 2));
       return NextResponse.json(
-        { error: "Gmail 접근 권한(gmail.readonly 스코프)이 없습니다. 로그아웃 후 다시 로그인해주세요." },
+        {
+          error: "Gmail 접근 권한(gmail.readonly 스코프)이 없습니다. 로그아웃 후 다시 로그인해주세요.",
+          googleError,
+        },
         { status: 403 }
       );
     }
