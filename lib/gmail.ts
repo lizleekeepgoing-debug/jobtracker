@@ -22,7 +22,8 @@ const ALLOWED_DOMAINS = [
 ];
 
 const JOB_KEYWORDS = [
-  "면접", "합격", "불합격", "탈락", "서류 전형", "채용", "인터뷰", "interview", "offer", "입사",
+  "면접", "합격", "불합격", "탈락", "서류", "전형", "채용", "인터뷰", "interview", "offer",
+  "입사", "지원", "접수", "축하", "환영", "결과",
 ];
 
 const EXCLUDE_KEYWORDS = [
@@ -95,7 +96,8 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
   const gmail = google.gmail({ version: "v1", auth });
 
   const query =
-    "subject:(면접 OR 합격 OR 불합격 OR 탈락 OR 서류 OR 채용 OR 인터뷰 OR interview OR offer OR 입사 OR 지원완료 OR 접수완료)";
+    "(from:(saramin.co.kr OR wantedlab.com OR jobkorea.co.kr OR wanted.co.kr OR getmiso.com OR jumpit.co.kr OR greeting.works OR workspear.com OR rememberapp.co.kr) " +
+    "OR subject:(면접 OR 합격 OR 불합격 OR 탈락 OR 서류 OR 전형 OR 채용 OR 인터뷰 OR interview OR offer OR 입사 OR 지원 OR 접수 OR 축하 OR 환영 OR 결과))";
 
   let pageToken: string | undefined;
   const messageStubs: { id: string }[] = [];
@@ -144,7 +146,8 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("접수되었습니다") ||
     text.includes("지원 완료") ||
     text.includes("접수 완료") ||
-    text.includes("지원해 주셔서")
+    text.includes("지원해 주셔서") ||
+    text.includes("지원해주셔서")
   ) return "지원완료";
 
   if (
@@ -172,6 +175,7 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("서류 합격") ||
     text.includes("서류합격") ||
     text.includes("서류 전형에 합격") ||
+    text.includes("서류전형에 합격") ||
     text.includes("다음 전형") ||
     text.includes("면접 합격") ||
     text.includes("입사를 환영") ||
