@@ -8,45 +8,22 @@ export interface EmailData {
   snippet: string;
 }
 
-const ALLOWED_DOMAINS = [
-  "saramin.co.kr",
-  "wantedlab.com",
-  "jobkorea.co.kr",
-  "wanted.co.kr",
-  "getmiso.com",
-  "jumpit.co.kr",
-  "greeting.works",
-  "greetinghr.com",
-  "workspear.com",
-  "rememberapp.co.kr",
-  "linkedin.com",
-];
-
-const JOB_KEYWORDS = [
-  "면접", "합격", "불합격", "탈락", "서류", "채용", "인터뷰", "interview", "offer", "입사",
-];
-
-const SUBJECT_QUERY_KEYWORDS = [
-  "면접", "합격", "불합격", "탈락", "서류전형", "채용결과", "인터뷰", "interview", "offer",
-];
+const SEARCH_QUERY =
+  "지원 OR 합격 OR 불합격 OR 면접 OR 탈락 OR 서류 OR 채용 OR 입사 OR interview OR offer OR recruit";
 
 const EXCLUDE_KEYWORDS = [
   "이력서를 열람", "공고가 마감", "마감되었습니다", "설문하고 스타벅스", "취업축하금",
-  "포인트 정책", "채용 진행 상황 확인 요청", "님을 원하고", "설명회", "채용박람회", "추천 포지션",
+  "포인트 정책", "채용 진행 상황 확인 요청", "설명회", "채용박람회", "추천 포지션",
+  "뉴스레터", "newsletter", "morning brew", "daily prompt", "로그인 인증번호", "결제", "광고",
 ];
 
-function isAllowedSender(from: string, subject: string): boolean {
-  if (ALLOWED_DOMAINS.some((domain) => from.includes(domain))) return true;
-  return JOB_KEYWORDS.some((kw) => subject.includes(kw));
-}
-
 function isExcludedByKeyword(subject: string, snippet: string): boolean {
-  const text = subject + " " + snippet;
-  return EXCLUDE_KEYWORDS.some((kw) => text.includes(kw));
+  const text = (subject + " " + snippet).toLowerCase();
+  return EXCLUDE_KEYWORDS.some((kw) => text.includes(kw.toLowerCase()));
 }
 
-const MAX_PAGES = 3;
-const MAX_TOTAL_MESSAGES = 500;
+const MAX_PAGES = 10;
+const MAX_TOTAL_MESSAGES = 5000;
 const DETAIL_BATCH_SIZE = 20;
 
 type GmailClient = ReturnType<typeof google.gmail>;
@@ -71,7 +48,7 @@ async function listMessageIds(gmail: GmailClient, query: string): Promise<string
     if (!pageToken || ids.length >= MAX_TOTAL_MESSAGES) break;
   }
 
-  return ids;
+  return ids.slice(0, MAX_TOTAL_MESSAGES);
 }
 
 async function fetchMessageDetail(gmail: GmailClient, messageId: string): Promise<EmailData | null> {
@@ -90,8 +67,8 @@ async function fetchMessageDetail(gmail: GmailClient, messageId: string): Promis
 
   console.log(`[gmail] subject: "${subject}" | from: ${from}`);
 
-  if (!isAllowedSender(from, subject)) return null;
   if (isExcludedByKeyword(subject, snippet)) return null;
+  if (classifyStatus(subject, snippet) === "기타") return null;
 
   return { id: messageId, subject, from, date, snippet };
 }
@@ -101,17 +78,10 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
   auth.setCredentials({ access_token: accessToken });
   const gmail = google.gmail({ version: "v1", auth });
 
-  const domainQuery = `from:(${ALLOWED_DOMAINS.join(" OR ")})`;
-  const subjectQuery = `subject:(${SUBJECT_QUERY_KEYWORDS.join(" OR ")})`;
+  const messageIds = await listMessageIds(gmail, SEARCH_QUERY);
 
-  const [domainIds, subjectIds] = await Promise.all([
-    listMessageIds(gmail, domainQuery),
-    listMessageIds(gmail, subjectQuery),
-  ]);
+  console.log(`[gmail] search matched ${messageIds.length} candidates`);
 
-  console.log(`[gmail] domain matches: ${domainIds.length}, subject matches: ${subjectIds.length}`);
-
-  const messageIds = Array.from(new Set([...domainIds, ...subjectIds])).slice(0, MAX_TOTAL_MESSAGES);
   const results: EmailData[] = [];
 
   for (let i = 0; i < messageIds.length; i += DETAIL_BATCH_SIZE) {
@@ -141,7 +111,8 @@ export function classifyStatus(subject: string, snippet: string): string {
     text.includes("접수되었습니다") ||
     text.includes("지원 완료") ||
     text.includes("접수 완료") ||
-    text.includes("지원해 주셔서")
+    text.includes("지원해 주셔서") ||
+    text.includes("지원이 접수")
   ) return "지원완료";
 
   if (
