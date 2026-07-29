@@ -27,8 +27,8 @@ const MAX_PAGES = 10;
 // so 1000 detail fetches (~5,000 units) leaves headroom while still finishing inside
 // the route's 60s maxDuration.
 const MAX_TOTAL_MESSAGES = 1000;
-const DETAIL_BATCH_SIZE = 20;
-const BATCH_DELAY_MS = 150;
+const DETAIL_BATCH_SIZE = 5;
+const BATCH_DELAY_MS = 500;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
 
@@ -81,7 +81,7 @@ async function listMessageIds(gmail: GmailClient, query: string): Promise<string
       gmail.users.messages.list({
         userId: "me",
         q: query,
-        maxResults: 500,
+        maxResults: 200,
         pageToken,
       })
     );
