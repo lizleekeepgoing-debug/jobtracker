@@ -23,22 +23,68 @@ function isExcludedByKeyword(subject: string, snippet: string): boolean {
 }
 
 const MAX_PAGES = 10;
-const MAX_TOTAL_MESSAGES = 5000;
+// Gmail's default per-user quota is 15,000 units/min; messages.get costs 5 units each,
+// so 1000 detail fetches (~5,000 units) leaves headroom while still finishing inside
+// the route's 60s maxDuration.
+const MAX_TOTAL_MESSAGES = 1000;
 const DETAIL_BATCH_SIZE = 20;
+const BATCH_DELAY_MS = 150;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1000;
 
 type GmailClient = ReturnType<typeof google.gmail>;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getErrorReason(error: unknown): string | undefined {
+  const err = error as {
+    code?: number;
+    errors?: Array<{ reason?: string }>;
+    response?: { data?: { error?: { errors?: Array<{ reason?: string }> } } };
+  };
+  return err.response?.data?.error?.errors?.[0]?.reason ?? err.errors?.[0]?.reason;
+}
+
+function isRateLimitError(error: unknown): boolean {
+  const err = error as { code?: number; status?: number };
+  const reason = getErrorReason(error);
+  return (
+    err.code === 429 ||
+    err.status === 429 ||
+    reason === "rateLimitExceeded" ||
+    reason === "userRateLimitExceeded" ||
+    reason === "quotaExceeded"
+  );
+}
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (!isRateLimitError(error) || attempt >= MAX_RETRIES) throw error;
+      const wait = RETRY_BASE_DELAY_MS * 2 ** attempt;
+      console.warn(`[gmail] rate limited, retrying in ${wait}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+      await sleep(wait);
+    }
+  }
+}
 
 async function listMessageIds(gmail: GmailClient, query: string): Promise<string[]> {
   let pageToken: string | undefined;
   const ids: string[] = [];
 
   for (let page = 0; page < MAX_PAGES; page++) {
-    const listRes = await gmail.users.messages.list({
-      userId: "me",
-      q: query,
-      maxResults: 500,
-      pageToken,
-    });
+    const listRes = await withRetry(() =>
+      gmail.users.messages.list({
+        userId: "me",
+        q: query,
+        maxResults: 500,
+        pageToken,
+      })
+    );
 
     for (const msg of listRes.data.messages || []) {
       if (msg.id) ids.push(msg.id);
@@ -52,12 +98,14 @@ async function listMessageIds(gmail: GmailClient, query: string): Promise<string
 }
 
 async function fetchMessageDetail(gmail: GmailClient, messageId: string): Promise<EmailData | null> {
-  const detail = await gmail.users.messages.get({
-    userId: "me",
-    id: messageId,
-    format: "metadata",
-    metadataHeaders: ["Subject", "From", "Date"],
-  });
+  const detail = await withRetry(() =>
+    gmail.users.messages.get({
+      userId: "me",
+      id: messageId,
+      format: "metadata",
+      metadataHeaders: ["Subject", "From", "Date"],
+    })
+  );
 
   const headers = detail.data.payload?.headers || [];
   const subject = headers.find((h) => h.name === "Subject")?.value || "";
@@ -90,6 +138,7 @@ export async function fetchJobEmails(accessToken: string): Promise<EmailData[]> 
     for (const email of batchResults) {
       if (email) results.push(email);
     }
+    if (i + DETAIL_BATCH_SIZE < messageIds.length) await sleep(BATCH_DELAY_MS);
   }
 
   console.log(`[gmail] fetched ${messageIds.length} candidates, kept ${results.length} after filtering`);
