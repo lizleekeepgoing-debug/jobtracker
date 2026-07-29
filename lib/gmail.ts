@@ -23,10 +23,9 @@ function isExcludedByKeyword(subject: string, snippet: string): boolean {
 }
 
 const MAX_PAGES = 10;
-// Gmail's default per-user quota is 15,000 units/min; messages.get costs 5 units each,
-// so 1000 detail fetches (~5,000 units) leaves headroom while still finishing inside
-// the route's 60s maxDuration.
-const MAX_TOTAL_MESSAGES = 1000;
+// With DETAIL_BATCH_SIZE=5 and BATCH_DELAY_MS=500, each batch takes ~0.8-1s, so
+// 250 messages (~50 batches) finishes within the route's 60s maxDuration.
+const MAX_TOTAL_MESSAGES = 250;
 const DETAIL_BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 500;
 const MAX_RETRIES = 3;
